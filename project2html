@@ -1,0 +1,91 @@
+<html>
+  <html>
+  <head>
+    <link href='http://fonts.googleapis.com/css?family=Varela' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="http://libs.cartocdn.com/cartodb.js/v3/themes/css/cartodb.css" />
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.2/css/bootstrap.min.css">
+    <!-- <link rel="stylesheet" href="slider.css"> -->
+    <!-- Load the d3 library. -->
+    <script src="http://d3js.org/d3.v3.min.js"></script>
+    <script src="http://libs.cartocdn.com/cartodb.js/v3/cartodb.js"></script>
+
+    <style>
+        html, body {width:100%; height:100%; padding: 0; margin: 0;}
+        #cartodb-map { width: 100%; height:100%; background: black;}
+    </style>
+  </head>
+<body>
+    <div class="row">
+        <div class="col-lg-12">
+            <div id='cartodb-map'></div>
+        </div>
+    </div>
+
+
+   <script>
+
+      var svg = d3.select("#Map").append("svg");
+            
+
+      var map = new L.Map('cartodb-map', { 
+                center: [0,0],
+                zoom: 10
+            });
+
+      /*Zoom to NYC*/
+      map.panTo([40.7627, -73.9059])
+          .setZoom(12);
+
+      /* Set up Base Map*/ 
+      L.tileLayer('http://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+      d3.csv("cartodb_accidents.csv", function(d) {
+         return {
+          Inj: d.INJURED,
+          Deaths: d.KILLED,
+          Lat: +d.LATITUDE,
+          Lon: +d.LONGITUDE,
+          cause1: d.FACTOR_VEHICLE1,
+          cause2: d.FACTOR_VEHICLE2
+        };
+      }, function(error, rows) {
+            console.log(rows);
+          for (var k = 0; k < rows.length; k++) {
+          plotAcc(rows[k].Inj,rows[k].Deaths,rows[k].Lat,rows[k].Lon,rows[k].cause1,rows[k].cause2);
+          }
+      });
+
+
+      function getColor(deaths){
+        if (deaths == 0){
+            return "orange";
+        }
+        else {
+            return "red";
+        }
+    };
+
+
+      function plotAcc(inj,deaths,lat,lon,cause1,cause2) {
+
+            var injScale = d3.scale.linear()
+            .domain([0.0,9.0])
+            .range([5,100]);
+
+            var severityScale = d3.scale.linear()
+            .domain([0.0,9.0])
+            .range([0,1]);
+
+            var circle = L.circle([lat,lon],injScale(inj+deaths),
+                {color: d3.interpolateLab("orange", "red")(severityScale(deaths+inj))},
+                {fill: true})
+                .addTo(map)
+                .bindPopup("<b>Accident Information</b><br>Deaths: "+deaths+"<br>Injuries "+inj+"<br>Driver 1 Main Cause: "+cause1+"<br>Driver 2 Main Cause: "+cause2);
+
+        };
+
+   </script>
+</body>
+</html>
