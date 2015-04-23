@@ -69,23 +69,50 @@
 
 
       function plotAcc(inj,deaths,lat,lon,cause1,cause2) {
+        //should be a quadratic scale because of radius vs area
+        var injScale = d3.scale.linear()
+        .domain([0.0,9.0])
+        .range([5,100]);
 
-            var injScale = d3.scale.linear()
-            .domain([0.0,9.0])
-            .range([5,100]);
+        var severityScale = d3.scale.linear()
+        .domain([0.0,9.0])
+        .range([0,1]);
 
-            var severityScale = d3.scale.linear()
-            .domain([0.0,9.0])
-            .range([0,1]);
+        var circle = L.circle([lat,lon],injScale(inj+deaths),
+            {color: d3.interpolateLab("orange", "red")(severityScale(deaths+inj))},
+            {fill: true})
+            .addTo(map)
+            .bindPopup("<b>Accident Information</b><br>Deaths: "+deaths+"<br>Injuries "+inj+"<br>Driver 1 Main Cause: "+cause1+"<br>Driver 2 Main Cause: "+cause2);
 
-            var circle = L.circle([lat,lon],injScale(inj+deaths),
-                {color: d3.interpolateLab("orange", "red")(severityScale(deaths+inj))},
-                {fill: true})
-                .addTo(map)
-                .bindPopup("<b>Accident Information</b><br>Deaths: "+deaths+"<br>Injuries "+inj+"<br>Driver 1 Main Cause: "+cause1+"<br>Driver 2 Main Cause: "+cause2);
+      };
 
-        };
-
+      // function plotComplaint(c){
+      // //   var radius = 10
+      // //   L.circle([c.latitude,c.longitude],
+      // //     radius,
+      // //     {color: 'blue',
+      // //      fillColor: 'blue',
+      // //      fillOpacity: 0.5})
+      // //   .addTo(map)
+      // //   // .bindPopup("<b>Street Condition Complaint</b>");
+      // //   //                // Closed Date: "+(c.closed == '' ? "Not //Closed" : c.closed)+"");
+      // // };
+      // // var temp;
+      // //  d3.csv("2013_NYC_Pothole_Complaints.csv",function(d){
+      // //   return {key: d["Unique Key"],
+      // //           created: d["Created Date"],
+      // //           closed: d["Closed Date"],
+      // //           agency: d["Agency"],
+      // //           complain: d["Complaint Type"],
+      // //           desc: d["Descriptor"],
+      // //           latitude: +d["Latitude"],
+      // //           longitude: +d["Longitude"]};
+      // //   },
+      // //   function(error, rows){
+      // //     rows.forEach(function(d){
+      // //       plotComplaint(d);
+      // //     })
+      // //   });
    </script>
 </body>
 </html>

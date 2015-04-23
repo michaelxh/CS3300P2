@@ -1,0 +1,233 @@
+<html>
+  <html>
+  <head>
+    <link href='http://fonts.googleapis.com/css?family=Varela' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet-0.7.3/leaflet.css" />
+    <!-- <link rel="stylesheet" href="slider.css"> -->
+    <!-- Load the d3 library. -->
+    <script src="http://d3js.org/d3.v3.min.js"></script>
+    <script src="http://cdn.leafletjs.com/leaflet-0.7.3/leaflet.js"></script>
+
+    <style>
+      html, body {width:100%; height:100%; padding: 0; margin: 0;}
+      #map { width: 100%; height:100%; background: black;}
+
+
+      .axis {
+        font: 10px sans-serif;
+      }
+
+      .axis .domain {
+        fill: none;
+        stroke: #000;
+        stroke-opacity: .3;
+        stroke-width: 10px;
+        stroke-linecap: round;
+      }
+
+      @font-face{
+        font-family: weather;
+        src: url('font/weather_icon.otf') format("opentype");
+      }
+    </style>
+  </head>
+<body>
+    <div id="map" style="height: 85%; width: 100%"></div>
+    <div id="slider"></div>
+
+   <script>
+
+    var map = new L.Map('map');
+
+    /*Zoom to NYC*/
+    map.panTo([40.7627, -73.9059])
+      .setZoom(12);
+
+    /* Set up Base Map*/ 
+    L.tileLayer('http://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', 
+      {attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'})
+      .addTo(map);
+
+    map._initPathRoot()
+
+    var svg = d3.select("#map").select("svg");
+    var g = svg.append("g");
+    var feat_complaint = [];
+
+    var slider_svg = d3.select("#slider").append("svg")
+      .attr("height","15%").attr("width","100%")
+
+    var slider_svg_width = parseInt(slider_svg.style("width").replace("px",""))
+    var slider_svg_height = parseInt(slider_svg.style("height").replace("px",""))
+
+    //brush setup
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    var start_date = new Date(2013,0,13,0,0,0,0)
+    var initial_extent = new Date(2013,0,14,0,0,0,0)
+    var end_date = new Date(2013,0,19,0,0,0,0)
+
+    
+    var xscale = d3.time.scale()
+      .domain([start_date,end_date])
+      .range([slider_svg_width*.25,slider_svg_width*.75])
+      .nice(d3.time.day)
+      .clamp(true)
+
+    var brush = d3.svg.brush()
+      .x(xscale)
+      .extent([start_date,initial_extent])
+      .on("brushstart",brushstart)
+      .on("brush",brushed)
+
+    slider_svg.append("g")
+      .attr("class","axis")
+      .attr("transform", "translate("+0+","+(slider_svg_height*0.80)+")")
+      .call(d3.svg.axis()
+          .scale(xscale)
+          .orient("bottom")
+          .tickSize(0)
+          .tickPadding(12)
+          .ticks(d3.time.day)
+          .tickFormat(d3.time.format("%b %e, %a")))
+
+
+    var slider = slider_svg.append("g")
+      .call(brush)
+      .selectAll("rect")
+      .attr("transform","translate(0,"+
+          (slider_svg_height*0.8-7.5)+")")
+      .attr("height",15)
+      .style("fill","#fff")
+      .attr("rx",5)
+      .attr("ry",5) 
+      .style("stroke","#000")
+      .style("stroke-opacity",0.5)
+      .style("stroke-width","1.25px")
+
+    //brush labels, weather, and time labels
+    var weather_label = slider_svg.append("text")
+      .attr("text-anchor","middle")
+      .attr("transform","translate(0,"+(slider_svg_height*0.80-15)+")")
+      .attr("font-size","50px")
+      .attr("font-family","weather")
+      .attr("fill","blue")
+      .text(function(d) {return "a"})
+      .attr("x",
+        (xscale(brush.extent()[0])
+        +xscale(brush.extent()[1]))/2);; 
+    
+    var time_label_front = slider_svg.append("text")
+      .attr("text-anchor","end")
+      .attr("transform","translate(0,"+(
+        slider_svg_height*0.80-5)+")")
+      .attr("font-size","10px")
+      .text(function(d){
+        return brush.extent()[0].toLocaleTimeString();})
+      .attr("x",xscale(brush.extent()[0]));
+
+    var time_label_back = slider_svg.append("text")
+      .attr("text-anchor","start")
+      .attr("transform","translate(0,"+(
+        slider_svg_height*0.80-5)+")")
+      .attr("font-size","10px")
+      .text(function(d){
+        return brush.extent()[1].toLocaleTimeString();})
+      .attr("x",xscale(brush.extent()[1]));
+
+    //opacity scalling no longer in use
+    var opacity_scale = d3.scale.linear()
+      .domain([0,172800000])
+      .range([0.8,0])
+      .clamp(true);
+
+    //brushstart
+    function brushstart(){
+      slider_svg.classed("selecting",true);
+    }
+    //when brush is moved
+    function brushed() {
+      var v1 = brush.extent()[0];
+      var v2 = brush.extent()[1];
+      //handle.attr("x", xscale(value)-15);
+      weather_label.attr("x",
+        (xscale(v1)+xscale(v2))/2);
+      update_complaints(v1,v2)
+      time_label_front.text(function(d){
+        return v1.toLocaleTimeString();})
+      .attr("x",xscale(v1));
+      time_label_back.text(function(d){
+        return v2.toLocaleTimeString();})
+      .attr("x",xscale(v2))
+    };
+    //to update complaint nodes
+    function update_complaints(v1,v2){
+      feat_complaint
+        .attr("opacity",function(d){
+          var dat = parse_date_time(d.created);
+          if (v2-dat>0 && dat-v1>0)
+            return 0.8;
+          else
+            return 0.01;
+        });
+    };
+    //for parsing 311 call times of format "1/1/2013 10:20"
+    function parse_date_time(s){
+      var dat = new Date(Date.parse(s.split(" ")[0]));
+      var time = s.split(" ")[1];
+      var hour = parseInt(time.split(":")[0])*3600000;
+      var min =  parseInt(time.split(":")[1])*60000;
+      var minusfive =  -5*3600000;
+      dat.setMilliseconds(dat.getMilliseconds() + hour + min + minusfive);
+      return dat;
+
+    }
+
+    //for modifying complaint information
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    d3.csv("pothole_complaints_jan.csv",function(d){
+     return {key: d["Unique Key"],
+            created: d["Created Date"],
+            closed: d["Closed Date"],
+            agency: d["Agency"],
+            complain: d["Complaint Type"],
+            desc: d["Descriptor"],
+            latitude: +d["Latitude"],
+            longitude: +d["Longitude"]};
+    },
+    function(error, rows){
+      rows.forEach(function(d){
+        d.LatLng = new L.LatLng(d.latitude,d.longitude)
+      })
+
+      feat_complaint = g.selectAll("circle")
+        .data(rows)
+        .enter()
+        .append("circle")
+        .attr("fill","red")
+        .style("stroke","none")
+        .attr("r",8);
+
+      map.on("viewreset", map_update_complaint);
+      map_update_complaint();
+
+      slider.call(brush.event);
+
+    });
+
+    function map_update_complaint(){
+      feat_complaint.attr("transform", 
+      function(d) { 
+       return "translate("+ 
+       map.latLngToLayerPoint(d.LatLng).x +","+ 
+       map.latLngToLayerPoint(d.LatLng).y +")";
+      }
+      )
+    };
+
+    //complaint accident toggling 
+    //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    d3
+
+   // </script>
+</body>
+</html>
